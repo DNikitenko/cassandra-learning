@@ -1,0 +1,122 @@
+ <!-- ColumnFamily: Authors We'll store all the author data here. Row Key => Author's name (implies names must be unique)
+ Column Name: an attribute for the entry (title, body, etc) Column Value: value of the associated attribute Access:
+ get author by name (aka grab all columns from a specific Row)
+ 
+ Authors : { // CF
+	Arin Sarkissian : { // row key
+		// and the columns as "profile" attributes
+		
+		numPosts: 11,
+		twitter: phatduckk,
+		email: arin@example.com,
+		bio: "bla bla bla" 
+	},
+	
+	// and the other authors
+	 
+	Author 2 { ... }
+ } --> 
+	
+<ColumnFamily CompareWith="BytesType" Name="Authors"/>
+
+
+ <!-- ColumnFamily: BlogEntries This is where all the blog entries will go: Row Key +> post's slug (the seo friendly portion of the uri)
+	  Column Name: an attribute for the entry (title, body, etc) Column Value: value of the associated attribute
+	  Access: grab an entry by slug (always fetch all Columns for Row) fyi: tags is a denormalization...
+	  its a comma separated list of tags. im not using json in order to not interfere with our notation but obviously
+	  you could use anything as long as your app knows how to deal w/ it
+ BlogEntries : { // CF
+	i-got-a-new-guitar : { // row key - the unique "slug" of the entry.
+	
+		title: This is a blog entry about my new, awesome guitar,
+		body: this is a cool entry. etc etc yada yada
+		author: Arin Sarkissian // a row key into the Authors CF
+		
+		tags: life,guitar,music // comma sep list of tags (basic denormalization)
+		pubDate: 1250558004 // unixtime for publish date
+		slug: i-got-a-new-guitar
+	},
+	
+	// all other entries
+	
+	another-cool-guitar : { ... tags: guitar, slug: another-cool-guitar },
+	scream-is-the-best-movie-ever : { ... tags: movie,horror, slug: scream-is-the-best-movie-ever }
+ } -->
+
+
+<ColumnFamily CompareWith="BytesType" Name="BlogEntries"/>
+
+
+<!-- ColumnFamily: TaggedPosts A secondary index to determine which BlogEntries are associated with a tag Row
+	 Key => tag Column Names: a TimeUUIDType Column Value: row key into BlogEntries CF Access: get a slice of entries tagged 'foo'
+	 We're gonna use this CF to determine which blog entries to show for a tag page. We'll be a bit ghetto and use the string __notag__ to mean "don't restrict by tag".
+	 Each entry will get a column in here... this means we'll have to have #tags + 1 columns for each post.
+ 
+ TaggedPosts : { // CF
+	// blog entries tagged "guitar"
+	guitar : { // Row key is the tag name
+		// column names are TimeUUIDType, value is the row key into BlogEntries
+		timeuuid_1 : i-got-a-new-guitar,
+		timeuuid_2 : another-cool-guitar,
+	},
+	
+	// here's all blog entries
+	__notag__ : {
+		timeuuid_1b : i-got-a-new-guitar,
+		// notice this is in the guitar Row as well
+		timeuuid_2b : another-cool-guitar,
+		// and this is in the movie Row as well
+		timeuuid_3b : scream-is-the-best-movie-ever,
+	},
+	
+	// blog entries tagged "movie"
+	movie: {
+		timeuuid_1c: scream-is-the-best-movie-ever
+	}
+ } -->
+ 
+ <ColumnFamily CompareWith="TimeUUIDType" Name="TaggedPosts"/> 
+	 
+	 
+	 
+<!-- ColumnFamily: Comments We store all comments here Row key => row key of the BlogEntry
+     SuperColumn name: TimeUUIDType Access: get all comments for an entry
+ Comments : {
+	// comments for scream-is-the-best-movie-ever
+	scream-is-the-best-movie-ever : { // row key = row key of BlogEntry
+		// oldest comment first
+		timeuuid_1 : { // SC Name
+			// all Columns in the SC are attribute of the comment
+			commenter: Joe Blow,
+			email: joeb@example.com,
+			comment: you're a dumb douche, the godfather is the best movie ever
+			commentTime: 1250438004
+		},
+		... more comments for scream-is-the-best-movie-ever
+		
+		// newest comment
+		last timeuuid_2 : {
+			commenter: Some Dude,
+			email: sd@example.com,
+			comment: be nice Joe Blow this isnt youtube
+			commentTime: 1250557004
+		},
+	},
+	// comments for i-got-a-new-guitar
+	i-got-a-new-guitar : {
+		timeuuid_1 : { // SC Name
+			// all Columns in the SC are attribute of the comment
+			commenter: Johnny Guitar,
+			email: guitardude@example.com,
+			comment: nice axe dawg...
+			commentTime: 1250438004
+		},
+	}
+	.. // then more Super CF's for the other entries
+	
+ } -->
+ 
+ <ColumnFamily CompareWith="TimeUUIDType" ColumnType="Super"  CompareSubcolumnsWith="BytesType" Name="Comments"/> 
+
+
+
